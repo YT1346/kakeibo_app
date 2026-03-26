@@ -1,0 +1,216 @@
+!apt-get -y install fonts-ipafont-gothic
+import csv
+from datetime import datetime
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+
+font_path = "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf"
+font_prop = fm.FontProperties(fname=font_path)
+
+plt.rcParams["font.family"]=font_prop.get_name()
+plt.rcParams["axes.unicode_minus"] = False
+FILE_NAME="kakeibo.csv"
+def init_file():
+    try:
+        with open(FILE_NAME,"x",newline="",encoding="utf-8-sig") as f:
+            writer=csv.writer(f)
+            writer.writerow(["日付","カテゴリ","金額"])
+    except FileExistsError:
+        pass
+def save_data(expenses):
+    with open(FILE_NAME,"w",newline="",encoding="utf-8-sig")as f:
+        fieldnames=["日付","カテゴリ","金額"]
+        writer=csv.DictWriter(f,fieldnames=fieldnames)
+
+        writer.writeheader()
+        for item in expenses:
+            writer.writerow({"日付":item["date"],"カテゴリ":item["category"],"金額":item["amount"]})
+def to_half_width(s):
+    return s.translate(str.maketrans("０１２３４５６７８９", "0123456789"))
+def add_data(expenses):
+    date=datetime.now().strftime("%Y-%m-%d")
+    categories=["食費","交通費","娯楽","日用品","その他"]
+    for i,c in enumerate(categories,1):
+        print(i,c)
+    try:
+        choice=int(input("番号を選択:"))
+    except:
+        print("数字を入力してください")
+        return
+    if 1<=choice<=len(categories):
+        category=categories[choice-1]
+    else:
+        print("正しい番号入力してください")
+        return
+
+    try:
+        amount_input=input("金額を入力:")
+        amount=to_half_width(amount_input)
+        amount=int(amount_input)
+
+        if amount<0:
+            print("0以上を入力してください")
+            return
+    except:
+        print("数字を入力してください")
+        return
+    expenses.append({"date":date,"category":category,"amount":amount})
+
+    print("保存しました")
+
+def load_data():
+    expenses=[]
+    try:
+        with open(FILE_NAME,"r",encoding="utf-8-sig")as f:
+            reader=csv.DictReader(f)
+            for row in reader:
+                if not row["日付"]:
+                    continue
+
+                expenses.append({"date":row["日付"],"category":row["カテゴリ"],"amount":int(row["金額"])})
+
+    except FileNotFoundError:
+        print("データがありません")
+    return expenses
+def show_data(expenses):
+    if not expenses:
+        print("データがありません")
+        return
+    print("番号 日付　カテゴリ　金額")
+    for i,item in enumerate((expenses),1):
+        print(i,item["date"],item["category"],item["amount"],"円")
+def delete_data(expenses):
+    show_data(expenses)
+
+    try:
+        index=int(input("削除する番号"))
+        if 1<=index<=len(expenses):
+            confirm=input("本当に削除しますか？y/n")
+            if confirm=="y":
+                del expenses[index-1]
+                print("削除しました")
+            else:
+                print("キャンセルしました")
+        else:
+           print("番号がありません")
+    except:
+        print("数字を入力してください")
+def update_data(expenses):
+    show_data(expenses)
+    try:
+        index=int(input("編集する番号:"))
+        if not (1<=index<=len(expenses)):
+            print("番号が違います")
+            return
+    except:
+        print("数字を入力してください")
+        return
+    item=expenses[index-1]
+    print(f"現在:{item['category']}{item['amount']}円")
+    categories=["食費","交通費","娯楽","日用品","その他"]
+
+    print("カテゴリを選んでください(そのままならenter)")
+    for i,c in enumerate((categories),1):
+        print(f"{i}:{c}")
+    choice=input("選択:")
+    if choice !="":
+        try:
+            choice=int(choice)
+            if 1<=choice<=len(categories):
+                item["category"]=categories[choice-1]
+            else:
+                print("番号が違います")
+        except:
+            print("数字を入力してください")
+            return
+
+        new_amount_input=input("新しい金額(そのままならenter)")
+        
+  
+        if new_amount_input !="":
+            try:
+                new_amount_input=to_half_width(new_amount_input)
+                new_amount=int(new_amount_input)
+                if new_amount<0:
+                    print("0以上を入力してください")
+                    return
+                item["amount"]=new_amount
+            except:
+                 print("数字を入力してください")
+                 return
+    print("更新しました")
+def summary_by_month(expenses):
+    data={}
+    for item in expenses:
+        month=item["date"][:7]
+        category=item["category"]
+        amount=item["amount"]
+        if month not in data:
+             data[month]={}
+        if category not in data[month]:
+            data[month][category]=0
+        data[month][category] +=amount
+    return data
+def show_ranking(data):
+    for month,categories in data.items():
+        print(month)
+        for i,(key,value) in enumerate(sorted(categories.items(),key=lambda x:x[1],reverse=True),1):
+            print(i,"位",key,value,"円")
+def show_graph(data):
+    target_month=input("月を入力(例:2026-03):")
+
+    if target_month not in data:
+        print("データがありません")
+        return
+    categories=data[target_month]
+
+    labels=list(categories.keys())
+    values=list(categories.values())
+
+    plt.figure()
+    plt.pie(values,labels=labels,autopct="%1.1f%%",textprops={"fontproperties": font_prop} )
+    plt.title(target_month+"の支出割合",fontproperties=font_prop)
+    plt.show()
+
+def main():
+    init_file()
+    expenses=load_data()
+    while True:
+        print("1:入力  2:削除　3:一覧 4:更新　5:集計  6:グラフ  7:終了")
+        choice=input("選択:")
+        if choice=="1":
+            add_data(expenses)
+            save_data(expenses)
+        elif choice=="2":
+            delete_data(expenses)
+            save_data(expenses)
+        elif choice=="3":
+             show_data(expenses)
+        elif choice=="4":
+             update_data(expenses)
+             save_data(expenses)
+        elif choice=="5":
+            data=summary_by_month(expenses)
+            show_ranking(data)
+        elif choice=="6":
+            data=summary_by_month(expenses)
+            show_graph(data)
+        elif choice=="7":
+            print("終了します")
+            break
+        else:
+             print("1～7をえらんでください")
+    while True:
+        download=input("ダウンロードしますか？y/n")
+        if download=="y":
+            from google.colab import files
+            files.download(FILE_NAME)
+            print("ダウンロードします")
+            break
+        elif download=="n":
+            print("終了")
+            break
+        else:
+            print("正しく入力してください")
+main()
+
