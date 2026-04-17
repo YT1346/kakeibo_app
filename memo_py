@@ -1,0 +1,180 @@
+import tkinter as tk
+import csv
+import pandas as pd
+from datetime import datetime
+FILE_NAME="memo.csv"
+
+def add_memo():
+    memo=entry.get()
+    if memo.strip()=="":
+        return
+   
+    now=datetime.now().strftime("%Y-%m-%d")
+    try:
+        with open(FILE_NAME,"x",newline="",encoding="utf-8-sig")as f:
+            writer=csv.writer(f)
+            writer.writerow(["date","text"])
+    except FileExistsError:
+        pass
+    with open(FILE_NAME,"a",newline="",encoding="utf-8-sig")as f:
+        writer=csv.writer(f)
+        writer.writerow([now,memo])
+
+    entry.delete(0,tk.END)
+    show_memo()
+
+def show_memo():
+    global order_desc
+    listbox.delete(0,tk.END)
+    try:
+          with open(FILE_NAME,"r",encoding="utf-8-sig")as f:
+              reader=csv.reader(f)
+              next(reader)
+              lines=list(reader)
+          if order_desc:
+              lines.reverse()
+          
+          for row in (lines):
+                if not row:
+                    continue
+                date,text=row
+                listbox.insert(tk.END,f"{date} {text}")
+    except FileNotFoundError:
+        pass
+def delete_memo():
+    selected=listbox.curselection()
+    if not selected:
+        return
+    index=selected[0]
+   
+    with open(FILE_NAME,"r",encoding="utf-8-sig")as f:
+        reader=csv.reader(f)
+        header=next(reader)
+        lines=list(reader)
+    if order_desc:
+        real_index=len(lines)-1-index
+    else:
+        real_index=index
+    
+    lines.pop(real_index)
+    with open(FILE_NAME,"w",newline="",encoding="utf-8-sig")as f:
+        writer=csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(lines)    
+    show_memo()
+def search_memo():
+    keyword=search_entry.get()
+    listbox.delete(0,tk.END)
+    try:
+        with open(FILE_NAME,"r",encoding="utf-8-sig")as f:
+            reader=csv.reader(f)
+            next(reader)
+            for row in reader:
+                if len(row)<2:
+                    continue
+                date,text=row
+                if keyword in row:
+                    listbox.insert(tk.END,f"{date} {text}")
+        
+            
+    except FileNotFoundError:
+        pass
+def update_memo():
+    selected=listbox.curselection()
+    if not selected:
+        return
+    index=selected[0]
+    
+    new_text=entry.get()
+
+    if new_text.strip()=="":
+        return
+    with open(FILE_NAME,"r",encoding="utf-8-sig")as f:
+         reader=csv.reader(f)
+         header=next(reader)
+         lines=list(reader)
+    if order_desc:
+        real_index=len(lines)-1-index
+    else:
+        real_index=index
+    lines[real_index][1]=new_text
+    
+    with open(FILE_NAME,"w",newline="",encoding="utf-8-sig")as f:
+         writer=csv.writer(f)
+         writer.writerow(header)
+         writer.writerows(lines)    
+    entry.delete(0,tk.END) 
+    show_memo()
+def select_memo(event):
+    selected=listbox.curselection()
+    if not selected:
+        return
+    index=selected[0]
+    text=listbox.get(index)
+    parts=text.split(" ",1)
+    if len(parts)<2:
+        return
+    content=parts[1]
+    entry.delete(0,tk.END)
+    entry.insert(0,content)
+order_desc=True
+def toggle_order():
+    global order_desc
+    order_desc=not order_desc
+    if order_desc:
+        button.config(text="新しい順")
+    else:
+        button.config(text="古い順")
+    show_memo()
+def analyze_memo():
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import matplotlib.font_manager as fm
+    try:
+        df=pd.read_csv(FILE_NAME)
+        df["date_only"]=df["date"].str[:10]
+        count=df.groupby("date_only").size().sort_index()
+        if not listbox.winfo_exists():
+            return
+        listbox.delete(0,tk.END)
+        print(df)
+        print(df["date"])
+        for date,num in count.items():
+            print(date,num)
+            listbox.insert(tk.END,f"{date}→{num}件")
+     
+        font_path = "C:/Windows/Fonts/msgothic.ttc"
+        font_prop = fm.FontProperties(fname=font_path)
+       
+        plt.rcParams["font.family"] = font_prop.get_name()
+
+        count.plot(kind="bar")
+        plt.title("日ごとのメモ数")
+        plt.xlabel("日付")
+        plt.ylabel("件数")
+        plt.show()
+    except FileNotFoundError:
+        pass
+
+root=tk.Tk()
+root.title("メモ帳アプリ")
+entry=tk.Entry(root,width=40)
+entry.pack(pady=5)
+entry.bind("<Return>",lambda event:add_memo())
+search_entry=tk.Entry(root,width=30)
+search_entry.pack(pady=5)
+frame=tk.Frame(root)
+frame.pack(pady=10)
+tk.Button(frame,text="追加",command=add_memo,width=15,bg="#31B3C4",fg="white").pack(side=tk.LEFT,padx=5)
+tk.Button(frame,text="削除",command=delete_memo,width=15,bg="#31B3C4",fg="white").pack(side=tk.LEFT,padx=5)
+tk.Button(frame,text="検索",command=search_memo,width=15,bg="#31B3C4",fg="white").pack(side=tk.LEFT,padx=5)
+tk.Button(frame,text="編集保存",command=update_memo,width=15,bg="#31B3C4",fg="white").pack(side=tk.LEFT,padx=5)
+tk.Button(frame,text="分析",command=analyze_memo).pack(side=tk.LEFT)
+listbox=tk.Listbox(root,width=50,height=10,font=("Arial",12),bg="#f0f0f0",fg="#333333",selectbackground="#41AD45")
+button=tk.Button(frame,text="新しい順",command=toggle_order)
+button.pack(side=tk.LEFT,padx=5)
+listbox.pack(pady=10)
+listbox.bind("<Double-Button-1>",select_memo)
+
+show_memo()
+root.mainloop()
